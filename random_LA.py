@@ -103,54 +103,38 @@ def _analyse_outer_prod(A, B, n_samples, cols, probs):
     return C / n_samples, errors
 
 def random_matmul_online(
-    file_path_a: str, file_path_b: str, output_file_path: str='output.csv',
-    n_samples: int=None, sampling: str='norm', random_state: int=None
+    file_path_a: str, file_path_b: str, output_file_path: str='output.npy',
+    n_samples: int=None, sampling: str='norm', random_state: int=None,
+    analysis: bool=False
 ):
     """
+    Read a matrix saved in a numpy binary file (.npy) and store in memory for 
+    randomized matrix multiplication.
 
+    Parameters
+    ----------
+    file_path_a, file_path_b : str
+        File paths for binary numpy matrix objects with .npy extension
+    
+    output_file_path : str
+        File path to store the results of the randomized matrix multiplication
+
+    Returns
+    -------
+    errors : list
+        List of errors. If analysis is True, errors at the interval of 50 
+        samples. When analysis is False, error at the end of the computation.
     """
-    # sampled = np.random.choice(np.arange(n), size=n_samples, p=probs)
-    # cols = read_sample_cols(file_path_a, )
-    # rows = read_sample_cols(file_path_b)
 
-    col1 = len(pd.read_csv(file_path_a, usecols=[0], header=None))
-    row2 = len(pd.read_csv(file_path_b, usecols=[0], header=None))
+    with open(file_path_a, 'rb') as f:
+        A = np.load(f)
 
-    if(col1 != row2):
-        raise ValueError("Dimensions doesnt match for matrix multiplication")
-    
-    with open(file_path_a, 'r') as f:
-        line = f.readline().strip().split(',')
-        m = len(line)
+    with open(file_path_b, 'rb') as f:
+        B = np.load(f)
 
-    with open(file_path_b, 'r') as f:
-        line = f.readline().strip().split(',')
-        p = len(line)
+    C, errors = random_matmul(A, B, n_samples, sampling, random_state, analysis)
 
-    n = col1
+    with open(output_file_path, 'wb') as f:
+        np.save(f, C)
 
-    if(n_samples is None):
-        n_samples = n
-    
-    if(random_state is not None):
-        np.random.seed(random_state)
-
-    if(sampling == 'norm'):
-        probs = np.zeros(n)
-        for i in range(n):
-            x = pd.read_csv(file_path_a, usecols=[i], header=None).values
-            y = pd.read_csv(file_path_b, usecols=[i], header=None).values
-            probs[i] = np.linalg.norm(x) * np.linalg.norm(y)
-
-        probs = probs / np.sum(probs)
-    
-    elif(sampling == 'uniform'):
-        probs = np.ones(n) / n
-
-    else:
-        raise ValueError("`sampling` must be uniform or norm")
-    
-    sampling_cols = np.random.choice(np.arange(n), n_samples, p=probs)
-
-    file = open(output_file_path)
-    file.close()
+    return errors
